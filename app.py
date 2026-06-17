@@ -16,8 +16,11 @@ API_KEY = os.environ["API_KEY"]
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", "50")) * 1024 * 1024
 MAX_GENERATED_BYTES = int(os.environ.get("MAX_GENERATED_MB", "100")) * 1024 * 1024
 PURGE_AFTER_HOURS = int(os.environ.get("PURGE_AFTER_HOURS", "24"))
-GOTENBERG_TIMEOUT_SECONDS = int(os.environ.get("GOTENBERG_TIMEOUT_SECONDS", "120"))
-GOTENBERG_URL = "http://127.0.0.1:3000"
+GOTENBERG_TIMEOUT_SECONDS = int(os.environ.get("GOTENBERG_TIMEOUT_SECONDS", "600"))
+GOTENBERG_URL = os.environ.get(
+    "GOTENBERG_URL",
+    f"http://{os.environ.get('API_BIND_IP', '127.0.0.1')}:{os.environ.get('API_PORT', '3000')}",
+)
 
 # Gotenberg requires an HTML wrapper that references the markdown file via its template helper.
 _MARKDOWN_WRAPPER = (
@@ -81,7 +84,13 @@ def save_stream(stream, maximum_bytes: int):
     total = 0
 
     try:
-        with os.fdopen(fd, "wb") as output:
+        try:
+            fh = os.fdopen(fd, "wb")
+        except OSError:
+            os.close(fd)
+            raise
+
+        with fh as output:
             while True:
                 chunk = stream.read(1024 * 1024)
                 if not chunk:
@@ -109,7 +118,7 @@ def read_markdown() -> str:
         return request.form.get("content", "")
     if "application/json" in content_type:
         payload = request.get_json(silent=True) or {}
-        return str(payload.get("content", ""))
+        return payload.get("content") or ""
     return request.get_data(as_text=True)
 
 

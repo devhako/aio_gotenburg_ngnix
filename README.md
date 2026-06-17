@@ -91,7 +91,7 @@ No authentication required. Links expire after `PURGE_AFTER_HOURS` (default 24 h
 ## Architecture
 
 ```
-Internet → Nginx :8080 ──┬── proxy → Gunicorn :9000 (Flask API)
+Internet → Nginx :8080 ──┬── proxy → Gunicorn :9000 (Flask API, configurable via FLASK_PORT)
                          │                 └── calls Gotenberg :3000 (Chromium)
                          └── static → /data/files (PDF downloads)
 ```

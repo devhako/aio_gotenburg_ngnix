@@ -10,7 +10,7 @@ if [[ ! "$PUBLIC_URL" =~ ^https?:// ]]; then
 fi
 
 for variable_name in MAX_UPLOAD_MB MAX_GENERATED_MB PURGE_AFTER_HOURS CLEANUP_INTERVAL_SECONDS GOTENBERG_TIMEOUT_SECONDS; do
-    value="${!variable_name}"
+    value="${!variable_name:-}"
     if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
         echo "$variable_name must be a positive integer" >&2
         exit 1
@@ -23,9 +23,13 @@ chmod 0750 /data/files
 
 NGINX_MAX_BODY_MB=$((MAX_UPLOAD_MB + 1))
 export NGINX_MAX_BODY_MB
+export FLASK_BIND_IP="${FLASK_BIND_IP:-127.0.0.1}"
+export FLASK_PORT="${FLASK_PORT:-9000}"
 
-# Substitute only this variable so native Nginx variables such as $host remain intact.
-envsubst '${NGINX_MAX_BODY_MB}' \
+export GOTENBERG_URL="http://${API_BIND_IP:-127.0.0.1}:${API_PORT:-3000}"
+
+# Substitute only explicit variables so native Nginx variables such as $host remain intact.
+envsubst '${NGINX_MAX_BODY_MB} ${FLASK_BIND_IP} ${FLASK_PORT}' \
     < /etc/nginx/templates/nginx.conf.template \
     > /etc/nginx/nginx.conf
 
@@ -34,7 +38,7 @@ cleanup_files() {
     while true; do
         find /data/files -maxdepth 1 -type f \
             \( -name '*.pdf' -o -name '.*.tmp' \) \
-            -mmin "+$((purge_minutes - 1))" -delete
+            -mmin "+$purge_minutes" -delete
         sleep "$CLEANUP_INTERVAL_SECONDS"
     done
 }
@@ -52,7 +56,7 @@ GOTENBERG_PID=$!
 runuser -u www-data -- \
     /opt/pdf-link/venv/bin/gunicorn \
     --chdir /opt/pdf-link \
-    --bind 127.0.0.1:9000 \
+    --bind "${FLASK_BIND_IP}:${FLASK_PORT}" \
     --workers 2 \
     --threads 4 \
     --timeout "$((GOTENBERG_TIMEOUT_SECONDS + 30))" \
@@ -67,5 +71,5 @@ CLEANUP_PID=$!
 nginx -g 'daemon off;' &
 NGINX_PID=$!
 
-wait -n "$GOTENBERG_PID" "$GUNICORN_PID" "$NGINX_PID" "$CLEANUP_PID"
+wait -n "$GOTENBERG_PID" "$GUNICORN_PID" "$NGINX_PID"
 exit 1

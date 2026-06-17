@@ -11,10 +11,17 @@ COPY requirements.txt requirements.txt
 
 ENV API_BIND_IP="127.0.0.1" \
     API_PORT="3000" \
+    FLASK_BIND_IP="127.0.0.1" \
+    FLASK_PORT="9000" \
     CHROMIUM_DENY_PRIVATE_IPS="true" \
     API_DOWNLOAD_FROM_DENY_PRIVATE_IPS="true" \
     PYTHONDONTWRITEBYTECODE="1" \
-    PYTHONUNBUFFERED="1"
+    PYTHONUNBUFFERED="1" \
+    MAX_UPLOAD_MB="50" \
+    MAX_GENERATED_MB="100" \
+    PURGE_AFTER_HOURS="24" \
+    CLEANUP_INTERVAL_SECONDS="3600" \
+    GOTENBERG_TIMEOUT_SECONDS="600"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
