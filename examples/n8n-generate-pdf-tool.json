@@ -6,6 +6,9 @@
           "values": [
             {
               "name": "content"
+            },
+            {
+              "name": "mode"
             }
           ]
         }
@@ -21,7 +24,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const payload = $json;\nconst content = String(payload.content ?? payload.markdown ?? '').trim();\n\nif (!content) {\n  throw new Error('Input must include a non-empty \"content\" field.');\n}\n\nreturn [\n  {\n    json: {\n      content\n    }\n  }\n];"
+        "jsCode": "const payload = $json;\nconst content = String(payload.content ?? payload.markdown ?? '').trim();\nconst mode = String(payload.mode ?? 'markdown').toLowerCase();\n\nif (!content) {\n  throw new Error('Input must include a non-empty \"content\" field.');\n}\n\nif (!['markdown', 'html'].includes(mode)) {\n  throw new Error('mode must be \"markdown\" or \"html\".');\n}\n\nreturn [\n  {\n    json: {\n      content,\n      mode\n    }\n  }\n];"
       },
       "id": "905deef4-89bb-4e8f-9b67-720ad4933aaa",
       "name": "Validate Input",
@@ -51,7 +54,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { content: $json.content } }}",
+        "jsonBody": "={{ { content: $json.content, mode: $json.mode } }}",
         "options": {}
       },
       "id": "265048c9-e97b-4d93-8e17-220a1a527c9a",

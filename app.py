@@ -112,14 +112,19 @@ def save_stream(stream, maximum_bytes: int):
         raise
 
 
-def read_markdown() -> str:
+def read_content() -> tuple[str, str]:
+    """Return (content, mode) where mode is 'markdown' or 'html'."""
     content_type = request.content_type or ""
     if "multipart/form-data" in content_type:
-        return request.form.get("content", "")
+        mode = request.form.get("mode", "markdown").lower()
+        return request.form.get("content", ""), mode
     if "application/json" in content_type:
         payload = request.get_json(silent=True) or {}
-        return payload.get("content") or ""
-    return request.get_data(as_text=True)
+        mode = str(payload.get("mode", "markdown")).lower()
+        return payload.get("content") or "", mode
+    # Raw body: honour ?mode= query param, default to markdown
+    mode = request.args.get("mode", "markdown").lower()
+    return request.get_data(as_text=True), mode
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -129,22 +134,35 @@ def handle_too_large(_error):
 
 @app.route("/upload", methods=["POST"])
 @require_api_key
-def upload_markdown():
-    markdown_text = read_markdown()
-    if not markdown_text or not markdown_text.strip():
-        return json_error("markdown content is required", 400)
+def upload():
+    content, mode = read_content()
+    if mode not in ("markdown", "html"):
+        return json_error("mode must be 'markdown' or 'html'", 400)
+    if not content or not content.strip():
+        return json_error(f"{mode} content is required", 400)
 
     try:
-        upstream = requests.post(
-            f"{GOTENBERG_URL}/forms/chromium/convert/markdown",
-            files=[
-                ("files", ("index.html", _MARKDOWN_WRAPPER.encode(), "text/html")),
-                ("files", ("content.md", markdown_text.encode(), "text/markdown")),
-            ],
-            headers={"Gotenberg-Output-Filename": uuid.uuid4().hex},
-            stream=True,
-            timeout=(5, GOTENBERG_TIMEOUT_SECONDS),
-        )
+        if mode == "markdown":
+            upstream = requests.post(
+                f"{GOTENBERG_URL}/forms/chromium/convert/markdown",
+                files=[
+                    ("files", ("index.html", _MARKDOWN_WRAPPER.encode(), "text/html")),
+                    ("files", ("content.md", content.encode(), "text/markdown")),
+                ],
+                headers={"Gotenberg-Output-Filename": uuid.uuid4().hex},
+                stream=True,
+                timeout=(5, GOTENBERG_TIMEOUT_SECONDS),
+            )
+        else:
+            upstream = requests.post(
+                f"{GOTENBERG_URL}/forms/chromium/convert/html",
+                files=[
+                    ("files", ("index.html", content.encode(), "text/html")),
+                ],
+                headers={"Gotenberg-Output-Filename": uuid.uuid4().hex},
+                stream=True,
+                timeout=(5, GOTENBERG_TIMEOUT_SECONDS),
+            )
     except requests.RequestException:
         return json_error("PDF conversion service is unavailable", 502)
 
