@@ -1,0 +1,155 @@
+{
+  "name": "Tool: Generate PDF Download Link",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "When Called by AI Agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json;\nconst content = String(payload.content ?? payload.markdown ?? '').trim();\n\nif (!content) {\n  throw new Error('Input must include a non-empty \"content\" field.');\n}\n\nif (!$env.PDF_SERVICE_URL) {\n  throw new Error('Missing PDF_SERVICE_URL environment variable in n8n.');\n}\n\nif (!$env.PDF_SERVICE_API_KEY) {\n  throw new Error('Missing PDF_SERVICE_API_KEY environment variable in n8n.');\n}\n\nreturn [\n  {\n    json: {\n      content\n    }\n  }\n];"
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.PDF_SERVICE_URL.replace(/\\/+$/, '') + '/upload'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.PDF_SERVICE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { content: $json.content } }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Create PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "out-1",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "out-2",
+              "name": "url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "out-3",
+              "name": "created_at",
+              "value": "={{ $json.created_at }}",
+              "type": "string"
+            },
+            {
+              "id": "out-4",
+              "name": "expires_at",
+              "value": "={{ $json.expires_at }}",
+              "type": "string"
+            },
+            {
+              "id": "out-5",
+              "name": "expires_in_seconds",
+              "value": "={{ $json.expires_in_seconds }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Format Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called by AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Create PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create PDF": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a1b2c3d4-0000-4000-8000-000000000000",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "generatePdfTool",
+  "tags": []
+}

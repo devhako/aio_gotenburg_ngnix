@@ -37,7 +37,7 @@ http {
             proxy_request_buffering off;
         }
 
-        location ~ ^/files/[0-9a-f]{32}\.pdf$ {
+        location ~ "^/files/[0-9a-f]{32}\\.pdf$" {
             root /data;
             autoindex off;
             limit_except GET { deny all; }

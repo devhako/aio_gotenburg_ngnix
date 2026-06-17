@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const payload = $json.body ?? $json;\nconst content = String(payload.content ?? payload.markdown ?? '').trim();\n\nif (!content) {\n  throw new Error('Request body must include a non-empty \"content\" field.');\n}\n\nconst serviceUrl = String($env.PDF_SERVICE_URL ?? '').replace(/\\/$/, '');\nconst apiKey = String($env.PDF_SERVICE_API_KEY ?? '');\n\nif (!serviceUrl) {\n  throw new Error('Missing PDF_SERVICE_URL environment variable in n8n.');\n}\n\nif (!apiKey) {\n  throw new Error('Missing PDF_SERVICE_API_KEY environment variable in n8n.');\n}\n\nreturn [\n  {\n    json: {\n      content,\n      serviceUrl,\n      apiKey\n    }\n  }\n];"
+        "jsCode": "const payload = $json.body ?? $json;\nconst content = String(payload.content ?? payload.markdown ?? '').trim();\n\nif (!content) {\n  throw new Error('Request body must include a non-empty \"content\" field.');\n}\n\nif (!$env.PDF_SERVICE_URL) {\n  throw new Error('Missing PDF_SERVICE_URL environment variable in n8n.');\n}\n\nif (!$env.PDF_SERVICE_API_KEY) {\n  throw new Error('Missing PDF_SERVICE_API_KEY environment variable in n8n.');\n}\n\nreturn [\n  {\n    json: {\n      content\n    }\n  }\n];"
       },
       "id": "bd8127f8-ddf4-48ca-8e75-87a12b2e6f44",
       "name": "Validate Input",
@@ -34,13 +34,13 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{$json.serviceUrl + '/upload'}}",
+        "url": "={{$env.PDF_SERVICE_URL.replace(/\\/+$/, '') + '/upload'}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-API-Key",
-              "value": "={{$json.apiKey}}"
+              "value": "={{$env.PDF_SERVICE_API_KEY}}"
             },
             {
               "name": "Content-Type",
