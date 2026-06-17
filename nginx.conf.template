@@ -1,0 +1,62 @@
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    access_log /dev/stdout;
+    error_log /dev/stderr warn;
+    server_tokens off;
+    sendfile on;
+    keepalive_timeout 30;
+    client_max_body_size ${NGINX_MAX_BODY_MB}m;
+
+    server {
+        listen 8080 default_server;
+        server_name _;
+
+        location = /upload {
+            limit_except POST { deny all; }
+
+            proxy_pass http://127.0.0.1:9000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_request_buffering off;
+        }
+
+        location ~ ^/files/[0-9a-f]{32}\.pdf$ {
+            root /data;
+            autoindex off;
+            limit_except GET { deny all; }
+            try_files $uri =404;
+
+            add_header Cache-Control "no-store" always;
+            add_header Referrer-Policy "no-referrer" always;
+            add_header X-Content-Type-Options "nosniff" always;
+        }
+
+        location /files/ {
+            return 404;
+        }
+
+        location = /healthz {
+            allow 127.0.0.1;
+            allow ::1;
+            deny all;
+            proxy_pass http://127.0.0.1:9000;
+        }
+
+        location / {
+            return 404;
+        }
+    }
+}

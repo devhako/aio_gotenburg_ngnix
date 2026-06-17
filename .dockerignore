@@ -1,0 +1,14 @@
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+README.md
+LICENSE
+build_and_publish.sh
+.claude

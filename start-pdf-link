@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+: "${PUBLIC_URL:?PUBLIC_URL must be set, for example https://pdf.example.com}"
+: "${API_KEY:?API_KEY must be set}"
+
+if [[ ! "$PUBLIC_URL" =~ ^https?:// ]]; then
+    echo "PUBLIC_URL must start with http:// or https://" >&2
+    exit 1
+fi
+
+for variable_name in MAX_UPLOAD_MB MAX_GENERATED_MB PURGE_AFTER_HOURS CLEANUP_INTERVAL_SECONDS GOTENBERG_TIMEOUT_SECONDS; do
+    value="${!variable_name}"
+    if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+        echo "$variable_name must be a positive integer" >&2
+        exit 1
+    fi
+done
+
+mkdir -p /data/files /run/nginx
+chown -R www-data:www-data /data/files
+chmod 0750 /data/files
+
+NGINX_MAX_BODY_MB=$((MAX_UPLOAD_MB + 1))
+export NGINX_MAX_BODY_MB
+
+# Substitute only this variable so native Nginx variables such as $host remain intact.
+envsubst '${NGINX_MAX_BODY_MB}' \
+    < /etc/nginx/templates/nginx.conf.template \
+    > /etc/nginx/nginx.conf
+
+cleanup_files() {
+    local purge_minutes=$((PURGE_AFTER_HOURS * 60))
+    while true; do
+        find /data/files -maxdepth 1 -type f \
+            \( -name '*.pdf' -o -name '.*.tmp' \) \
+            -mmin "+$((purge_minutes - 1))" -delete
+        sleep "$CLEANUP_INTERVAL_SECONDS"
+    done
+}
+
+shutdown() {
+    trap - TERM INT EXIT
+    kill -TERM "${NGINX_PID:-}" "${GUNICORN_PID:-}" "${GOTENBERG_PID:-}" "${CLEANUP_PID:-}" 2>/dev/null || true
+    wait 2>/dev/null || true
+}
+trap shutdown TERM INT EXIT
+
+runuser -u gotenberg -- gotenberg &
+GOTENBERG_PID=$!
+
+runuser -u www-data -- \
+    /opt/pdf-link/venv/bin/gunicorn \
+    --chdir /opt/pdf-link \
+    --bind 127.0.0.1:9000 \
+    --workers 2 \
+    --threads 4 \
+    --timeout "$((GOTENBERG_TIMEOUT_SECONDS + 30))" \
+    --access-logfile - \
+    --error-logfile - \
+    app:app &
+GUNICORN_PID=$!
+
+cleanup_files &
+CLEANUP_PID=$!
+
+nginx -g 'daemon off;' &
+NGINX_PID=$!
+
+wait -n "$GOTENBERG_PID" "$GUNICORN_PID" "$NGINX_PID" "$CLEANUP_PID"
+exit 1
